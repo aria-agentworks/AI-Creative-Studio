@@ -1,0 +1,22 @@
+{
+  "name": "ai-creative-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Image Generation Studio powered by NVIDIA NIM — Flux 2 models, zero restrictions",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.4.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "tailwindcss": "^4.0.0"
+  }
+}
