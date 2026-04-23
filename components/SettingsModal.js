@@ -6,36 +6,33 @@ export default function SettingsModal({ apiKey, onClose, onChangeKey }) {
       <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-8 w-full max-w-sm shadow-2xl">
         <h2 className="text-white font-bold text-lg mb-2">Settings</h2>
         <p className="text-white/40 text-[13px] mb-8">
-          Manage your NVIDIA NIM API key and preferences.
+          Manage your fal.ai API key and preferences.
         </p>
 
         <div className="space-y-4 mb-8">
           <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
-            <label className="block text-xs font-bold text-white/30 mb-2">
-              Active API Key
-            </label>
+            <label className="block text-xs font-bold text-white/30 mb-2">Active API Key</label>
             <div className="text-[13px] font-mono text-white/80">
-              {apiKey.slice(0, 12)}{'•'.repeat(24)}
+              {apiKey.slice(0, 8)}{'•'.repeat(24)}
             </div>
           </div>
 
           <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
-            <label className="block text-xs font-bold text-white/30 mb-2">
-              API Provider
-            </label>
+            <label className="block text-xs font-bold text-white/30 mb-2">API Provider</label>
             <div className="text-[13px] text-white/80 flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500" />
-              NVIDIA NIM (build.nvidia.com)
+              fal.ai
             </div>
           </div>
 
           <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
-            <label className="block text-xs font-bold text-white/30 mb-2">
-              Available Models
-            </label>
-            <div className="text-[13px] text-white/80">
-              Flux 2 Pro, Flux 2 Dev, Flux 2 Flex, Flux 2 Klein
-            </div>
+            <label className="block text-xs font-bold text-white/30 mb-2">Image Models</label>
+            <div className="text-[13px] text-white/80">Flux 2 Pro, Flux 2 Dev, Flux 2 Flex, Flux 2 Max, Flux 2 Turbo, Flux 2 Flash</div>
+          </div>
+
+          <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
+            <label className="block text-xs font-bold text-white/30 mb-2">Video Models</label>
+            <div className="text-[13px] text-white/80">Seedance 2.0 (Text-to-Video, Image-to-Video)</div>
           </div>
         </div>
 

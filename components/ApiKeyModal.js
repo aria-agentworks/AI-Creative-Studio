@@ -10,11 +10,7 @@ export default function ApiKeyModal({ onSave }) {
     e.preventDefault();
     const trimmed = key.trim();
     if (!trimmed) {
-      setError('Please enter your NVIDIA API key');
-      return;
-    }
-    if (!trimmed.startsWith('nvapi-')) {
-      setError('NVIDIA API keys start with "nvapi-"');
+      setError('Please enter your fal.ai API key');
       return;
     }
     onSave(trimmed);
@@ -33,20 +29,20 @@ export default function ApiKeyModal({ onSave }) {
             AI Creative Studio
           </h1>
           <p className="text-white/40 text-[13px] leading-relaxed px-4">
-            Enter your NVIDIA NIM API key to start generating with Flux 2
+            Enter your fal.ai API key to generate with Flux 2 and Seedance 2.0
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <label className="block text-xs font-bold text-white/30 ml-1">
-              NVIDIA API Key
+              fal.ai API Key
             </label>
             <input
               type="password"
               value={key}
               onChange={(e) => { setKey(e.target.value); setError(''); }}
-              placeholder="nvapi-..."
+              placeholder="Enter your fal.ai key..."
               className="w-full bg-white/5 border border-white/[0.03] rounded-md px-5 py-3 text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-1 focus:ring-[#d9ff00]/30 focus:bg-white/[0.07] transition-all"
             />
             {error && <p className="mt-2 text-red-500/80 text-[11px] font-medium ml-1">{error}</p>}
@@ -62,12 +58,12 @@ export default function ApiKeyModal({ onSave }) {
           <p className="text-center text-[12px] text-white/20 pt-2">
             Need a key?{' '}
             <a
-              href="https://build.nvidia.com/"
+              href="https://fal.ai/dashboard/keys"
               target="_blank"
               rel="noreferrer"
               className="text-white/40 hover:text-[#d9ff00] transition-colors font-medium"
             >
-              Get one free at build.nvidia.com
+              Get one at fal.ai
             </a>
           </p>
         </form>

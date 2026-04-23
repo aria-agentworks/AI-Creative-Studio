@@ -1,16 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import ApiKeyModal from '@/components/ApiKeyModal';
 import ImageGenerator from '@/components/ImageGenerator';
+import VideoGenerator from '@/components/VideoGenerator';
 import SettingsModal from '@/components/SettingsModal';
 
-const STORAGE_KEY = 'nvidia_api_key';
+const STORAGE_KEY = 'fal_api_key';
+const TABS = [
+  { id: 'image', label: 'Image Studio' },
+  { id: 'video', label: 'Video Studio' },
+];
 
 export default function Home() {
   const [apiKey, setApiKey] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState('image');
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -43,8 +49,9 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-[#030303] flex flex-col overflow-hidden">
-      <Header onSettingsOpen={() => setShowSettings(true)} apiKey={apiKey} />
-      <ImageGenerator apiKey={apiKey} />
+      <Header onSettingsOpen={() => setShowSettings(true)} apiKey={apiKey} activeTab={activeTab} onTabChange={setActiveTab} tabs={TABS} />
+      {activeTab === 'image' && <ImageGenerator apiKey={apiKey} />}
+      {activeTab === 'video' && <VideoGenerator apiKey={apiKey} />}
       {showSettings && (
         <SettingsModal
           apiKey={apiKey}

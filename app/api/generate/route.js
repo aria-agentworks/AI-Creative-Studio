@@ -1,100 +1,189 @@
 import { NextResponse } from 'next/server';
 
-const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
+const FAL_BASE = 'https://queue.fal.run';
 
+function getClientKey(request, providedKey) {
+  // Use key from request body (passed from client localStorage)
+  // or fallback to env var if set
+  if (providedKey) return providedKey;
+  return process.env.FAL_API_KEY || '';
+}
+
+async function submitToQueue(endpoint, payload, apiKey) {
+  const url = `${FAL_BASE}/${endpoint}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Key ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = `API error (${response.status})`;
+    try {
+      const errData = await response.json();
+      errorMsg = errData.detail || errData.error || errData.message || errorMsg;
+    } catch {
+      try { errorMsg = await response.text(); } catch {}
+    }
+    throw new Error(errorMsg);
+  }
+
+  return await response.json();
+}
+
+async function getResult(endpoint, requestId, apiKey) {
+  const url = `${FAL_BASE}/${endpoint}/requests/${requestId}`;
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch result (${response.status})`);
+  }
+
+  return await response.json();
+}
+
+async function getStatus(endpoint, requestId, apiKey) {
+  const url = `${FAL_BASE}/${endpoint}/requests/${requestId}/status`;
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch status (${response.status})`);
+  }
+
+  return await response.json();
+}
+
+// Try direct (sync) endpoint first, fall back to queue
+async function tryDirect(endpoint, payload, apiKey) {
+  const url = `https://fal.run/${endpoint}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Key ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) return null;
+  return await response.json();
+}
+
+// POST /api/generate — Submit generation request
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { model, prompt, width, height, seed, n } = body;
+    const { endpoint, payload, apiKey } = body;
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    if (!endpoint || !payload) {
+      return NextResponse.json({ error: 'Missing endpoint or payload' }, { status: 400 });
     }
 
-    // Get API key from environment variable (set in Vercel dashboard)
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'NVIDIA API key not configured. Please set NVIDIA_API_KEY environment variable.' },
-        { status: 500 }
-      );
+    const clientKey = getClientKey(request, apiKey);
+    if (!clientKey) {
+      return NextResponse.json({ error: 'API key required. Set it in settings.' }, { status: 401 });
     }
 
-    // NVIDIA NIM uses OpenAI-compatible image generation API
-    const size = `${width}x${height}`;
+    console.log(`[fal.ai] Submitting to: ${endpoint}`);
 
-    const payload = {
-      model: model,
-      prompt: prompt,
-      n: n || 1,
-      size: size,
-    };
+    // Try direct (sync) first for fast image models
+    const directResult = await tryDirect(endpoint, payload, clientKey);
 
-    // Only include seed if it's provided and not -1
-    if (seed && seed !== -1) {
-      payload.seed = seed;
-    }
-
-    console.log(`[NVIDIA NIM] Generating image with model: ${model}, size: ${size}`);
-
-    const response = await fetch(`${NVIDIA_BASE}/images/generations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'NVCF-Function-Id': model,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('[NVIDIA NIM] API Error:', response.status, data);
-      const errorMsg = data?.detail || data?.error?.message || data?.message || `NVIDIA API error (${response.status})`;
-      return NextResponse.json({ error: errorMsg }, { status: response.status });
-    }
-
-    // Normalize response - NVIDIA may return data in different formats
-    const images = [];
-
-    if (data.data) {
-      // OpenAI format: { data: [{ url, b64_json }] }
-      for (const item of data.data) {
-        if (item.url) {
-          images.push({ url: item.url });
-        } else if (item.b64_json) {
-          images.push({ b64_json: item.b64_json });
-        }
+    if (directResult) {
+      // Direct result — extract image or video URL
+      if (directResult.images && directResult.images.length > 0) {
+        console.log(`[fal.ai] Direct result: got ${directResult.images.length} image(s)`);
+        return NextResponse.json({ imageUrl: directResult.images[0].url, seed: directResult.seed });
       }
-    } else if (data.images) {
-      // Alternative format
-      for (const item of data.images) {
-        if (item.url) {
-          images.push({ url: item.url });
-        } else if (item.base64) {
-          images.push({ b64_json: item.base64 });
-        }
+      if (directResult.video && directResult.video.url) {
+        console.log(`[fal.ai] Direct result: got video`);
+        return NextResponse.json({ videoUrl: directResult.video.url, seed: directResult.seed });
       }
     }
 
-    if (images.length === 0) {
-      console.error('[NVIDIA NIM] No images in response:', JSON.stringify(data).slice(0, 500));
-      return NextResponse.json({ error: 'No images were generated. Try a different prompt.' }, { status: 500 });
+    // Fall back to queue (async) mode
+    const submitData = await submitToQueue(endpoint, payload, clientKey);
+    const requestId = submitData.request_id || submitData.id;
+
+    if (!requestId) {
+      // Maybe it returned a direct result in queue format
+      if (submitData.images) {
+        return NextResponse.json({ imageUrl: submitData.images[0].url });
+      }
+      if (submitData.video) {
+        return NextResponse.json({ videoUrl: submitData.video.url });
+      }
+      throw new Error('No request ID returned from queue');
     }
 
-    console.log(`[NVIDIA NIM] Successfully generated ${images.length} image(s)`);
-
-    return NextResponse.json({
-      images,
-      seeds: data.seeds || [seed],
-    });
+    console.log(`[fal.ai] Queued: request_id=${requestId}`);
+    return NextResponse.json({ requestId });
 
   } catch (error) {
-    console.error('[NVIDIA NIM] Generation error:', error);
-    return NextResponse.json(
-      { error: error.message || 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    console.error('[fal.ai] Error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// GET /api/status — Poll for generation result
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const endpoint = searchParams.get('endpoint');
+    const requestId = searchParams.get('requestId');
+    const apiKey = searchParams.get('apiKey');
+
+    if (!endpoint || !requestId) {
+      return NextResponse.json({ error: 'Missing endpoint or requestId' }, { status: 400 });
+    }
+
+    const clientKey = getClientKey(request, apiKey);
+    if (!clientKey) {
+      return NextResponse.json({ error: 'API key required' }, { status: 401 });
+    }
+
+    // Check status first
+    const statusData = await getStatus(endpoint, requestId, clientKey);
+    const status = statusData.status;
+
+    if (status === 'COMPLETED') {
+      // Fetch the actual result
+      const result = await getResult(endpoint, requestId, clientKey);
+
+      const imageUrl = result.images?.[0]?.url || null;
+      const videoUrl = result.video?.url || null;
+
+      return NextResponse.json({
+        status: 'COMPLETED',
+        imageUrl,
+        videoUrl,
+        seed: result.seed,
+      });
+    }
+
+    if (status === 'FAILED') {
+      return NextResponse.json({
+        status: 'FAILED',
+        error: result?.error || 'Generation failed',
+      });
+    }
+
+    return NextResponse.json({ status });
+
+  } catch (error) {
+    console.error('[fal.ai] Status error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

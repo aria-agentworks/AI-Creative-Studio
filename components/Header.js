@@ -1,6 +1,6 @@
 'use client';
 
-export default function Header({ onSettingsOpen, apiKey }) {
+export default function Header({ onSettingsOpen, apiKey, activeTab, onTabChange, tabs }) {
   return (
     <header className="flex-shrink-0 h-14 border-b border-white/[0.03] flex items-center justify-between px-6 bg-black/20 backdrop-blur-md z-40">
       {/* Left: Logo */}
@@ -12,9 +12,29 @@ export default function Header({ onSettingsOpen, apiKey }) {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold tracking-tight text-white">AI Creative Studio</span>
-          <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#d9ff00]/10 text-[#d9ff00] border border-[#d9ff00]/20">NVIDIA NIM</span>
+          <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#d9ff00]/10 text-[#d9ff00] border border-[#d9ff00]/20">fal.ai</span>
         </div>
       </div>
+
+      {/* Center: Tab Navigation */}
+      <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={`relative py-4 px-4 text-[13px] font-medium transition-all whitespace-nowrap ${
+              activeTab === tab.id
+                ? 'text-[#d9ff00]'
+                : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            {tab.label}
+            {activeTab === tab.id && (
+              <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#d9ff00] rounded-full" />
+            )}
+          </button>
+        ))}
+      </nav>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-4">

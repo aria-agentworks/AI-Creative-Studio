@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'AI Creative Studio — NVIDIA NIM Image Generation',
-  description: 'Generate stunning AI images with Flux 2 models powered by NVIDIA NIM. Zero restrictions, free tier available.',
+  title: 'AI Creative Studio — Image & Video Generation',
+  description: 'Generate stunning AI images and videos with Flux 2 and Seedance 2.0 powered by fal.ai.',
   icons: {
     icon: '/favicon.ico',
   },
