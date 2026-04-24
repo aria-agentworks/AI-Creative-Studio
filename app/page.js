@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
-import ApiKeyModal from '@/components/ApiKeyModal';
 import ImageGenerator from '@/components/ImageGenerator';
 import VideoGenerator from '@/components/VideoGenerator';
 import SettingsModal from '@/components/SettingsModal';
@@ -32,14 +31,6 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
   }, []);
 
-  const handleInitialSetup = useCallback((key, provider) => {
-    const updated = { ...apiKeys, [provider]: key };
-    saveKeys(updated);
-  }, [apiKeys, saveKeys]);
-
-  // User has at least one key OR can use free models (Pollinations needs no key)
-  const canUseApp = isLoaded && (apiKeys.fal || apiKeys.together || apiKeys.huggingface || apiKeys.gemini || true); // always allow — Pollinations is free
-
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-[#030303] flex items-center justify-center">
@@ -48,10 +39,8 @@ export default function Home() {
     );
   }
 
-  if (!apiKeys.fal && !apiKeys.together && !apiKeys.huggingface && !apiKeys.gemini) {
-    return <ApiKeyModal onSave={handleInitialSetup} />;
-  }
-
+  // No modal — app works immediately with free Pollinations.ai models
+  // Users can add API keys anytime in Settings
   return (
     <div className="h-screen bg-[#030303] flex flex-col overflow-hidden">
       <Header onSettingsOpen={() => setShowSettings(true)} apiKeys={apiKeys} activeTab={activeTab} onTabChange={setActiveTab} tabs={TABS} />
