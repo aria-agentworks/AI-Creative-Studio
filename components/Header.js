@@ -1,6 +1,8 @@
 'use client';
 
-export default function Header({ onSettingsOpen, apiKey, activeTab, onTabChange, tabs }) {
+export default function Header({ onSettingsOpen, apiKeys, activeTab, onTabChange, tabs }) {
+  const activeKeyCount = Object.keys(apiKeys || {}).filter(k => apiKeys[k]).length;
+
   return (
     <header className="flex-shrink-0 h-14 border-b border-white/[0.03] flex items-center justify-between px-6 bg-black/20 backdrop-blur-md z-40">
       {/* Left: Logo */}
@@ -12,7 +14,9 @@ export default function Header({ onSettingsOpen, apiKey, activeTab, onTabChange,
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold tracking-tight text-white">AI Creative Studio</span>
-          <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#d9ff00]/10 text-[#d9ff00] border border-[#d9ff00]/20">fal.ai</span>
+          <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
+            {activeKeyCount + 1} provider{activeKeyCount !== 0 ? 's' : ''}
+          </span>
         </div>
       </div>
 
@@ -40,7 +44,7 @@ export default function Header({ onSettingsOpen, apiKey, activeTab, onTabChange,
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[11px] font-medium text-white/70">Connected</span>
+          <span className="text-[11px] font-medium text-white/70">{activeKeyCount} key{activeKeyCount !== 1 ? 's' : ''}</span>
         </div>
 
         <button

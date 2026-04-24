@@ -12,7 +12,7 @@ const VIDEO_MODELS = [
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
 const DURATIONS = ['auto', '4', '5', '6', '8', '10'];
 
-export default function VideoGenerator({ apiKey }) {
+export default function VideoGenerator({ apiKeys }) {
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState(VIDEO_MODELS[0]);
   const [aspectRatio, setAspectRatio] = useState('16:9');
@@ -61,9 +61,9 @@ export default function VideoGenerator({ apiKey }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          endpoint: selectedModel.id,
-          payload,
-          apiKey,
+          provider: 'fal',
+          payload: { endpoint: selectedModel.id, ...payload },
+          apiKeys,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -105,8 +105,9 @@ export default function VideoGenerator({ apiKey }) {
         const elapsed = Math.round(attempts * pollInterval / 1000);
         setProgress(`Generating... (${elapsed}s)`);
 
+        const falKey = apiKeys?.fal || '';
         const statusRes = await fetch(
-          `/api/status?endpoint=${encodeURIComponent(selectedModel.id)}&requestId=${requestId}&apiKey=${encodeURIComponent(apiKey)}`
+          `/api/generate?endpoint=${encodeURIComponent(selectedModel.id)}&requestId=${requestId}&apiKey=${encodeURIComponent(falKey)}`
         );
         const statusData = await statusRes.json();
 
@@ -135,7 +136,7 @@ export default function VideoGenerator({ apiKey }) {
       setProgress('');
       abortControllerRef.current = null;
     }
-  }, [prompt, selectedModel, aspectRatio, duration, generateAudio, seed, imageUrl, isGenerating, apiKey]);
+  }, [prompt, selectedModel, aspectRatio, duration, generateAudio, seed, imageUrl, isGenerating, apiKeys]);
 
   const handleCancel = () => {
     if (abortControllerRef.current) abortControllerRef.current.abort();

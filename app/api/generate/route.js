@@ -1,209 +1,323 @@
 import { NextResponse } from 'next/server';
 
-const FAL_BASE = 'https://queue.fal.run';
-
-function getClientKey(request, providedKey) {
-  if (providedKey) return providedKey;
-  return process.env.FAL_API_KEY || '';
-}
-
 async function parseJSON(response) {
   const text = await response.text();
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`Invalid JSON response from API: ${text.slice(0, 200)}`);
+    throw new Error(`Invalid response: ${text.slice(0, 300)}`);
   }
 }
 
-async function submitToQueue(endpoint, payload, apiKey) {
-  const url = `${FAL_BASE}/${endpoint}`;
+// ==========================================
+// PROVIDER 1: Pollinations.ai (FREE, no key)
+// ==========================================
+async function generatePollinations(payload) {
+  const { prompt, width = 1024, height = 1024, model = 'flux' } = payload;
+  const encodedPrompt = encodeURIComponent(prompt);
+  const seed = payload.seed && payload.seed !== -1 ? `&seed=${payload.seed}` : `&seed=${Math.floor(Math.random() * 999999)}`;
+  const nologo = '&nologo=true';
+  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=${model}${seed}${nologo}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Pollinations error (${response.status})`);
+  }
+
+  // Returns the image directly — we return the URL itself
+  const imageUrl = url;
+  return { imageUrl, seed: payload.seed || 0 };
+}
+
+// ==========================================
+// PROVIDER 2: Together AI (FREE FLUX.1-schnell)
+// ==========================================
+async function generateTogether(payload, apiKey) {
+  if (!apiKey) throw new Error('Together AI key required. Add it in Settings.');
+
+  const w = payload.width || 1024;
+  const h = payload.height || 1024;
+
+  const response = await fetch('https://api.together.xyz/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: payload.model_id || 'black-forest-labs/FLUX.1-schnell',
+      prompt: payload.prompt,
+      n: 1,
+      width: w,
+      height: h,
+      steps: payload.steps || 4,
+    }),
+  });
+
+  if (!response.ok) {
+    let msg = `Together AI error (${response.status})`;
+    try { const d = await parseJSON(response); msg = d.error?.message || d.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  const data = await parseJSON(response);
+  const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+  if (!imageUrl) throw new Error('No image returned from Together AI');
+  return { imageUrl, seed: data.data?.[0]?.seed || 0 };
+}
+
+// ==========================================
+// PROVIDER 3: Hugging Face (FREE inference)
+// ==========================================
+async function generateHuggingFace(payload, apiKey) {
+  if (!apiKey) throw new Error('Hugging Face token required. Add it in Settings.');
+
+  const modelId = payload.model_id || 'black-forest-labs/FLUX.1-schnell';
+  const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      inputs: payload.prompt,
+      parameters: {
+        width: payload.width || 1024,
+        height: payload.height || 1024,
+        num_inference_steps: payload.steps || 4,
+        seed: payload.seed && payload.seed !== -1 ? payload.seed : undefined,
+      },
+    }),
+  });
+
+  if (response.status === 503) {
+    const data = await parseJSON(response);
+    const estTime = data.estimated_time || 30;
+    throw new Error(`Model is loading. Please try again in ~${Math.ceil(estTime)} seconds.`);
+  }
+
+  if (!response.ok) {
+    let msg = `Hugging Face error (${response.status})`;
+    try { const d = await parseJSON(response); msg = d.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  // HF returns raw image bytes, not JSON
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('image')) {
+    const blob = await response.blob();
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    const base64 = `data:${contentType};base64,${buffer.toString('base64')}`;
+    return { imageUrl: base64, seed: payload.seed || 0 };
+  }
+
+  // Some models return JSON with URL
+  try {
+    const data = await parseJSON(response);
+    if (data[0]?.image) return { imageUrl: data[0].image, seed: 0 };
+    if (data.images?.[0]?.url) return { imageUrl: data.images[0].url, seed: 0 };
+  } catch {}
+
+  throw new Error('Unexpected response format from Hugging Face');
+}
+
+// ==========================================
+// PROVIDER 4: Google Gemini (FREE image gen)
+// ==========================================
+async function generateGemini(payload, apiKey) {
+  if (!apiKey) throw new Error('Google Gemini key required. Add it in Settings.');
+
+  const model = payload.model_id || 'gemini-2.0-flash-image-generation';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Key ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: `Generate an image: ${payload.prompt}` }] }],
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    }),
   });
 
   if (!response.ok) {
-    let errorMsg = `API error (${response.status})`;
+    let msg = `Gemini error (${response.status})`;
     try {
-      const errData = await parseJSON(response);
-      errorMsg = errData.detail || errData.error || errData.message || errorMsg;
-    } catch {
-      try { errorMsg = await response.text(); } catch {}
+      const d = await parseJSON(response);
+      msg = d.error?.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  const data = await parseJSON(response);
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    if (part.inlineData) {
+      const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      return { imageUrl, seed: 0 };
     }
-    throw new Error(errorMsg);
   }
-
-  return await parseJSON(response);
+  throw new Error('No image in Gemini response');
 }
 
-async function getResult(endpoint, requestId, apiKey) {
-  const url = `${FAL_BASE}/${endpoint}/requests/${requestId}`;
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Key ${apiKey}`,
-    },
-  });
+// ==========================================
+// PROVIDER 5: fal.ai (paid, existing logic)
+// ==========================================
+const FAL_BASE = 'https://queue.fal.run';
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch result (${response.status})`);
-  }
+async function generateFal(payload, apiKey) {
+  if (!apiKey) throw new Error('fal.ai key required. Add it in Settings.');
 
-  return await parseJSON(response);
-}
+  const { endpoint, ...rest } = payload;
+  const falPayload = { ...rest };
 
-async function getStatus(endpoint, requestId, apiKey) {
-  const url = `${FAL_BASE}/${endpoint}/requests/${requestId}/status`;
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Key ${apiKey}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch status (${response.status})`);
-  }
-
-  return await parseJSON(response);
-}
-
-// Try direct (sync) endpoint first, fall back to queue
-async function tryDirect(endpoint, payload, apiKey) {
+  // Try direct (sync) first
   try {
-    const url = `https://fal.run/${endpoint}`;
-    const response = await fetch(url, {
+    const directRes = await fetch(`https://fal.run/${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Key ${apiKey}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(falPayload),
     });
-
-    if (!response.ok) return null;
-    return await parseJSON(response);
-  } catch (error) {
-    console.log(`[fal.ai] Direct attempt failed: ${error.message}`);
-    return null;
+    if (directRes.ok) {
+      const data = await parseJSON(directRes);
+      if (data.images?.[0]?.url) return { imageUrl: data.images[0].url, seed: data.seed };
+      if (data.video?.url) return { videoUrl: data.video.url, seed: data.seed };
+    }
+  } catch (e) {
+    console.log(`[fal.ai] Direct failed: ${e.message}`);
   }
+
+  // Fall back to queue
+  const queueRes = await fetch(`${FAL_BASE}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Key ${apiKey}`,
+    },
+    body: JSON.stringify(falPayload),
+  });
+
+  if (!queueRes.ok) {
+    let msg = `fal.ai error (${queueRes.status})`;
+    try { const d = await parseJSON(queueRes); msg = d.detail || d.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  const submitData = await parseJSON(queueRes);
+  const requestId = submitData.request_id || submitData.id;
+
+  if (!requestId) {
+    if (submitData.images?.[0]?.url) return { imageUrl: submitData.images[0].url };
+    if (submitData.video?.url) return { videoUrl: submitData.video.url };
+    throw new Error('No request ID from fal.ai queue');
+  }
+
+  return { requestId, endpoint };
 }
 
-// POST /api/generate — Submit generation request
+// ==========================================
+// MAIN ROUTE HANDLER
+// ==========================================
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { endpoint, payload, apiKey } = body;
+    const { provider, payload, apiKeys } = body;
 
-    if (!endpoint || !payload) {
-      return NextResponse.json({ error: 'Missing endpoint or payload' }, { status: 400 });
+    if (!provider || !payload) {
+      return NextResponse.json({ error: 'Missing provider or payload' }, { status: 400 });
     }
 
-    const clientKey = getClientKey(request, apiKey);
-    if (!clientKey) {
-      return NextResponse.json({ error: 'API key required. Set it in settings.' }, { status: 401 });
+    console.log(`[${provider}] Generating: ${payload.prompt?.slice(0, 50)}...`);
+
+    let result;
+
+    switch (provider) {
+      case 'pollinations':
+        result = await generatePollinations(payload);
+        break;
+
+      case 'together':
+        result = await generateTogether(payload, apiKeys?.together || process.env.TOGETHER_API_KEY);
+        break;
+
+      case 'huggingface':
+        result = await generateHuggingFace(payload, apiKeys?.huggingface || process.env.HF_API_KEY);
+        break;
+
+      case 'gemini':
+        result = await generateGemini(payload, apiKeys?.gemini || process.env.GEMINI_API_KEY);
+        break;
+
+      case 'fal':
+        result = await generateFal(payload, apiKeys?.fal || process.env.FAL_API_KEY);
+        break;
+
+      default:
+        return NextResponse.json({ error: `Unknown provider: ${provider}` }, { status: 400 });
     }
 
-    console.log(`[fal.ai] Submitting to: ${endpoint}`);
-
-    // Try direct (sync) first for fast image models
-    const directResult = await tryDirect(endpoint, payload, clientKey);
-
-    if (directResult) {
-      // Direct result — extract image or video URL
-      if (directResult.images && directResult.images.length > 0) {
-        console.log(`[fal.ai] Direct result: got ${directResult.images.length} image(s)`);
-        return NextResponse.json({ imageUrl: directResult.images[0].url, seed: directResult.seed });
-      }
-      if (directResult.video && directResult.video.url) {
-        console.log(`[fal.ai] Direct result: got video`);
-        return NextResponse.json({ videoUrl: directResult.video.url, seed: directResult.seed });
-      }
-    }
-
-    // Fall back to queue (async) mode
-    const submitData = await submitToQueue(endpoint, payload, clientKey);
-    const requestId = submitData.request_id || submitData.id;
-
-    if (!requestId) {
-      // Maybe it returned a direct result in queue format
-      if (submitData.images && submitData.images.length > 0) {
-        return NextResponse.json({ imageUrl: submitData.images[0].url });
-      }
-      if (submitData.video) {
-        return NextResponse.json({ videoUrl: submitData.video.url });
-      }
-      throw new Error('No request ID returned from queue');
-    }
-
-    console.log(`[fal.ai] Queued: request_id=${requestId}`);
-    return NextResponse.json({ requestId });
+    return NextResponse.json(result);
 
   } catch (error) {
-    console.error('[fal.ai] Error:', error.message);
+    console.error(`[generate] Error: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// GET /api/status — Poll for generation result
+// GET /api/generate — Poll for fal.ai queue results
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const endpoint = searchParams.get('endpoint');
     const requestId = searchParams.get('requestId');
-    const apiKey = searchParams.get('apiKey');
+    const apiKey = searchParams.get('apiKey') || process.env.FAL_API_KEY;
 
     if (!endpoint || !requestId) {
       return NextResponse.json({ error: 'Missing endpoint or requestId' }, { status: 400 });
     }
-
-    const clientKey = getClientKey(request, apiKey);
-    if (!clientKey) {
-      return NextResponse.json({ error: 'API key required' }, { status: 401 });
+    if (!apiKey) {
+      return NextResponse.json({ error: 'fal.ai API key required' }, { status: 401 });
     }
 
-    // Check status first
-    const statusData = await getStatus(endpoint, requestId, clientKey);
-    const status = statusData.status;
+    const statusRes = await fetch(`${FAL_BASE}/${endpoint}/requests/${requestId}/status`, {
+      headers: { 'Authorization': `Key ${apiKey}` },
+    });
 
-    if (status === 'COMPLETED') {
-      // Fetch the actual result
-      const result = await getResult(endpoint, requestId, clientKey);
+    if (!statusRes.ok) throw new Error(`Status check failed (${statusRes.status})`);
+    const statusData = await parseJSON(statusRes);
 
-      const imageUrl = result.images?.[0]?.url || null;
-      const videoUrl = result.video?.url || null;
-
+    if (statusData.status === 'COMPLETED') {
+      const resultRes = await fetch(`${FAL_BASE}/${endpoint}/requests/${requestId}`, {
+        headers: { 'Authorization': `Key ${apiKey}` },
+      });
+      const result = await parseJSON(resultRes);
       return NextResponse.json({
         status: 'COMPLETED',
-        imageUrl,
-        videoUrl,
+        imageUrl: result.images?.[0]?.url || null,
+        videoUrl: result.video?.url || null,
         seed: result.seed,
       });
     }
 
-    if (status === 'FAILED') {
-      // Fetch the error details from the result
+    if (statusData.status === 'FAILED') {
       let errorMsg = 'Generation failed';
       try {
-        const result = await getResult(endpoint, requestId, clientKey);
-        errorMsg = result.error || result.detail || errorMsg;
-      } catch {
-        // If we can't get the result, just use the default message
-      }
-      return NextResponse.json({
-        status: 'FAILED',
-        error: errorMsg,
-      });
+        const r = await fetch(`${FAL_BASE}/${endpoint}/requests/${requestId}`, {
+          headers: { 'Authorization': `Key ${apiKey}` },
+        });
+        const d = await parseJSON(r);
+        errorMsg = d.error || errorMsg;
+      } catch {}
+      return NextResponse.json({ status: 'FAILED', error: errorMsg });
     }
 
-    return NextResponse.json({ status });
+    return NextResponse.json({ status: statusData.status });
 
   } catch (error) {
-    console.error('[fal.ai] Status error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

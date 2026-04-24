@@ -7,33 +7,38 @@ import ImageGenerator from '@/components/ImageGenerator';
 import VideoGenerator from '@/components/VideoGenerator';
 import SettingsModal from '@/components/SettingsModal';
 
-const STORAGE_KEY = 'fal_api_key';
+const STORAGE_KEY = 'ai_studio_keys';
 const TABS = [
   { id: 'image', label: 'Image Studio' },
   { id: 'video', label: 'Video Studio' },
 ];
 
 export default function Home() {
-  const [apiKey, setApiKey] = useState(null);
+  const [apiKeys, setApiKeys] = useState({});
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('image');
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) setApiKey(stored);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) setApiKeys(JSON.parse(stored));
+    } catch {}
     setIsLoaded(true);
   }, []);
 
-  const handleKeySave = useCallback((key) => {
-    localStorage.setItem(STORAGE_KEY, key);
-    setApiKey(key);
+  const saveKeys = useCallback((keys) => {
+    setApiKeys(keys);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
   }, []);
 
-  const handleKeyChange = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setApiKey(null);
-  }, []);
+  const handleInitialSetup = useCallback((key, provider) => {
+    const updated = { ...apiKeys, [provider]: key };
+    saveKeys(updated);
+  }, [apiKeys, saveKeys]);
+
+  // User has at least one key OR can use free models (Pollinations needs no key)
+  const canUseApp = isLoaded && (apiKeys.fal || apiKeys.together || apiKeys.huggingface || apiKeys.gemini || true); // always allow — Pollinations is free
 
   if (!isLoaded) {
     return (
@@ -43,20 +48,20 @@ export default function Home() {
     );
   }
 
-  if (!apiKey) {
-    return <ApiKeyModal onSave={handleKeySave} />;
+  if (!apiKeys.fal && !apiKeys.together && !apiKeys.huggingface && !apiKeys.gemini) {
+    return <ApiKeyModal onSave={handleInitialSetup} />;
   }
 
   return (
     <div className="h-screen bg-[#030303] flex flex-col overflow-hidden">
-      <Header onSettingsOpen={() => setShowSettings(true)} apiKey={apiKey} activeTab={activeTab} onTabChange={setActiveTab} tabs={TABS} />
-      {activeTab === 'image' && <ImageGenerator apiKey={apiKey} />}
-      {activeTab === 'video' && <VideoGenerator apiKey={apiKey} />}
+      <Header onSettingsOpen={() => setShowSettings(true)} apiKeys={apiKeys} activeTab={activeTab} onTabChange={setActiveTab} tabs={TABS} />
+      {activeTab === 'image' && <ImageGenerator apiKeys={apiKeys} />}
+      {activeTab === 'video' && <VideoGenerator apiKeys={apiKeys} />}
       {showSettings && (
         <SettingsModal
-          apiKey={apiKey}
+          apiKeys={apiKeys}
           onClose={() => setShowSettings(false)}
-          onChangeKey={handleKeyChange}
+          onSave={saveKeys}
         />
       )}
     </div>
