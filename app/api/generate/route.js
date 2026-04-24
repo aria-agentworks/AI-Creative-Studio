@@ -130,23 +130,23 @@ async function generateGemini(payload, apiKey) {
   const model = payload.model_id || 'gemini-2.0-flash-image-generation';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  // Build parts — include reference image if provided
-  const parts = [];
+  // Build requestParts — include reference image if provided
+  const requestParts = [];
   if (payload.image) {
     const matches = payload.image.match(/^data:(.+?);base64,/);
     const mimeType = matches ? matches[1] : 'image/jpeg';
     const base64Data = payload.image.replace(/^data:.+?;base64,/, '');
-    parts.push({ inlineData: { mimeType, data: base64Data } });
-    parts.push({ text: `Based on this reference image, generate: ${payload.prompt}` });
+    requestParts.push({ inlineData: { mimeType, data: base64Data } });
+    requestParts.push({ text: `Based on this reference image, generate: ${payload.prompt}` });
   } else {
-    parts.push({ text: `Generate an image: ${payload.prompt}` });
+    requestParts.push({ text: `Generate an image: ${payload.prompt}` });
   }
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts }],
+      contents: [{ parts: requestParts }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
