@@ -130,11 +130,23 @@ async function generateGemini(payload, apiKey) {
   const model = payload.model_id || 'gemini-2.0-flash-image-generation';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  // Build parts — include reference image if provided
+  const parts = [];
+  if (payload.image) {
+    const matches = payload.image.match(/^data:(.+?);base64,/);
+    const mimeType = matches ? matches[1] : 'image/jpeg';
+    const base64Data = payload.image.replace(/^data:.+?;base64,/, '');
+    parts.push({ inlineData: { mimeType, data: base64Data } });
+    parts.push({ text: `Based on this reference image, generate: ${payload.prompt}` });
+  } else {
+    parts.push({ text: `Generate an image: ${payload.prompt}` });
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `Generate an image: ${payload.prompt}` }] }],
+      contents: [{ parts }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
@@ -162,15 +174,66 @@ async function generateGemini(payload, apiKey) {
 }
 
 // ==========================================
-// PROVIDER 5: fal.ai (paid, existing logic)
+// PROVIDER 5: Hugging Face VIDEO (free inference)
+// ==========================================
+async function generateHuggingFaceVideo(payload, apiKey) {
+  if (!apiKey) throw new Error('Hugging Face token required. Add it in Settings.');
+
+  const modelId = payload.model_id;
+  const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload.request_body || { inputs: payload.prompt }),
+  });
+
+  if (response.status === 503) {
+    const data = await parseJSON(response);
+    const estTime = data.estimated_time || 60;
+    throw new Error(`Model is loading (cold start). Please try again in ~${Math.ceil(estTime)} seconds.`);
+  }
+
+  if (!response.ok) {
+    let msg = `Hugging Face Video error (${response.status})`;
+    try { const d = await parseJSON(response); msg = d.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  // HF returns raw video bytes for video models
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('video') || contentType.includes('octet-stream')) {
+    const blob = await response.blob();
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    const base64 = `data:video/mp4;base64,${buffer.toString('base64')}`;
+    return { videoUrl: base64 };
+  }
+
+  // Some models may return JSON with a URL
+  try {
+    const data = await parseJSON(response);
+    if (data[0]?.url) return { videoUrl: data[0].url };
+    if (data.video?.url) return { videoUrl: data.video.url };
+    if (data.output?.url) return { videoUrl: data.output.url };
+    if (typeof data[0] === 'string' && data[0].startsWith('http')) return { videoUrl: data[0] };
+  } catch {}
+
+  throw new Error('Unexpected response from Hugging Face video model');
+}
+
+// ==========================================
+// PROVIDER 6: fal.ai (paid, existing logic)
 // ==========================================
 const FAL_BASE = 'https://queue.fal.run';
 
 async function generateFal(payload, apiKey) {
   if (!apiKey) throw new Error('fal.ai key required. Add it in Settings.');
 
-  const { endpoint, ...rest } = payload;
+  const { endpoint, image, ...rest } = payload;
   const falPayload = { ...rest };
+  // Add reference image if provided (image_url for img2img/editing)
+  if (image) falPayload.image_url = image;
 
   // Try direct (sync) first
   try {
@@ -250,6 +313,10 @@ export async function POST(request) {
 
       case 'gemini':
         result = await generateGemini(payload, apiKeys?.gemini || process.env.GEMINI_API_KEY);
+        break;
+
+      case 'huggingface_video':
+        result = await generateHuggingFaceVideo(payload, apiKeys?.huggingface || process.env.HF_API_KEY);
         break;
 
       case 'fal':
