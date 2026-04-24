@@ -15,13 +15,8 @@ const MODELS = [
   { id: 'pollinations-flux', provider: 'pollinations', name: 'Flux', desc: 'Unlimited, no API key needed', tier: 'free', payload: { model: 'flux' }, supportsRef: false },
   { id: 'pollinations-turbo', provider: 'pollinations', name: 'Flux Turbo', desc: 'Fast free generation, no key', tier: 'free', payload: { model: 'turbo' }, supportsRef: false },
   // ===== FREE — NEEDS FREE API KEY =====
+  { id: 'hf-flux-schnell', provider: 'huggingface', name: 'FLUX.1 Schnell', desc: 'Top quality open-source (HF token)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
   { id: 'together-flux-schnell', provider: 'together', name: 'FLUX.1 Schnell', desc: 'Free unlimited (Together AI key)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
-  { id: 'hf-flux-schnell', provider: 'huggingface', name: 'FLUX.1 Schnell', desc: 'Best open-source quality (HF token)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
-  { id: 'hf-sdxl', provider: 'huggingface', name: 'Stable Diffusion XL', desc: 'Classic versatile model (HF token)', tier: 'free_key', payload: { model_id: 'stabilityai/stable-diffusion-xl-base-1.0', steps: 30 }, supportsRef: false },
-  { id: 'hf-sd35-turbo', provider: 'huggingface', name: 'SD 3.5 Turbo', desc: 'Fast high quality (HF token)', tier: 'free_key', payload: { model_id: 'stabilityai/stable-diffusion-3.5-large-turbo', steps: 4 }, supportsRef: false },
-  { id: 'hf-kolors', provider: 'huggingface', name: 'Kolors', desc: 'Top aesthetic quality (HF token)', tier: 'free_key', payload: { model_id: 'Kwai-Kolors/Kolors', steps: 25 }, supportsRef: false },
-  { id: 'hf-playground', provider: 'huggingface', name: 'Playground v2.5', desc: 'Excellent aesthetics (HF token)', tier: 'free_key', payload: { model_id: 'playgroundai/playground-v2.5-1024px-aesthetic', steps: 25 }, supportsRef: false },
-  { id: 'hf-sd3-medium', provider: 'huggingface', name: 'Stable Diffusion 3 Medium', desc: 'Premium open-source (HF token)', tier: 'free_key', payload: { model_id: 'stabilityai/stable-diffusion-3-medium', steps: 28 }, supportsRef: false },
   { id: 'gemini-flash', provider: 'gemini', name: 'Gemini 2.0 Flash', desc: 'Free ~500/day + ref image (Gemini key)', tier: 'free_key', payload: { model_id: 'gemini-2.0-flash-image-generation' }, supportsRef: true },
   // ===== PREMIUM =====
   { id: 'together-flux-dev', provider: 'together', name: 'FLUX.1 Dev', desc: 'High quality (Together credits)', tier: 'paid', payload: { model_id: 'black-forest-labs/FLUX.1-dev', steps: 28 }, supportsRef: false },

@@ -14,38 +14,9 @@ const PROVIDERS = {
 // VIDEO MODELS — grouped by tier
 // =============================================
 const VIDEO_MODELS = [
-  // ===== FREE — Needs free HF token =====
-  {
-    id: 'hf-hunyuan', provider: 'huggingface_video', name: 'HunyuanVideo', tier: 'free_key',
-    desc: 'Top open-source text-to-video (by Tencent)', type: 'text',
-    payload: { model_id: 'tencent/HunyuanVideo', request_body: { inputs: 'PLACEHOLDER' } },
-    warn: 'First run may take 2-5 min (cold start). Max ~100 requests/day.',
-  },
-  {
-    id: 'hf-animatediff', provider: 'huggingface_video', name: 'AnimateDiff Lightning', tier: 'free_key',
-    desc: 'Fast text-to-animation (by ByteDance)', type: 'text',
-    payload: { model_id: 'ByteDance/AnimateDiff-Lightning', request_body: { inputs: 'PLACEHOLDER', parameters: { num_inference_steps: 4 } } },
-    warn: 'Fast generation. First run may take 1-3 min (cold start).',
-  },
-  {
-    id: 'hf-ltx-video', provider: 'huggingface_video', name: 'LTX-Video', tier: 'free_key',
-    desc: 'Efficient text-to-video (by Lightricks)', type: 'text',
-    payload: { model_id: 'Lightricks/LTX-Video-0.9.5', request_body: { inputs: 'PLACEHOLDER' } },
-    warn: 'Good quality-to-speed ratio. First run may take 2-4 min.',
-  },
-  {
-    id: 'hf-wan21', provider: 'huggingface_video', name: 'Wan2.1 T2V', tier: 'free_key',
-    desc: 'Text-to-video open-source (by Alibaba)', type: 'text',
-    payload: { model_id: 'Wan-AI/Wan2.1-T2V-1.3B', request_body: { inputs: 'PLACEHOLDER' } },
-    warn: 'Lightweight model, faster generation. First run may take 2-4 min.',
-  },
-  {
-    id: 'hf-svd', provider: 'huggingface_video', name: 'Stable Video Diffusion', tier: 'free_key',
-    desc: 'Image-to-video (by Stability AI)', type: 'image',
-    payload: { model_id: 'stabilityai/stable-video-diffusion-img2vid-xt' },
-    warn: 'Animates a reference image into a short video clip.',
-    supportsRef: true,
-  },
+  // ===== FREE — Needs free HF token (FLUX.1-schnell for frame-based) =====
+  // Note: Most open-source video models are not on HF free inference.
+  // Free text-to-video coming soon. Use fal.ai for production video.
   // ===== PREMIUM — fal.ai =====
   { id: 'bytedance/seedance-2.0/text-to-video', provider: 'fal', name: 'Seedance 2.0', tier: 'paid', desc: 'Best quality video generation', type: 'text', supportsRef: false },
   { id: 'bytedance/seedance-2.0/fast/text-to-video', provider: 'fal', name: 'Seedance 2.0 Fast', tier: 'paid', desc: 'Lower cost, faster generation', type: 'text', supportsRef: false },
@@ -256,8 +227,7 @@ export default function VideoGenerator({ apiKeys }) {
   };
 
   const tierSections = [
-    { key: 'free_key', title: 'FREE \u2014 Open-Source Video Models (needs HF token)', models: VIDEO_MODELS.filter(m => m.tier === 'free_key'), icon: '\ud83d\udd13' },
-    { key: 'paid', title: 'Premium \u2014 fal.ai Seedance 2.0 (needs API key)', models: VIDEO_MODELS.filter(m => m.tier === 'paid'), icon: '\ud83d\udc51' },
+    { key: 'paid', title: 'Video Models \u2014 fal.ai Seedance 2.0', models: VIDEO_MODELS, icon: '\ud83c\udfac' },
   ];
 
   return (

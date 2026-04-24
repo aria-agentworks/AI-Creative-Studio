@@ -73,7 +73,7 @@ async function generateHuggingFace(payload, apiKey) {
   if (!apiKey) throw new Error('Hugging Face token required. Add it in Settings.');
 
   const modelId = payload.model_id || 'black-forest-labs/FLUX.1-schnell';
-  const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+  const response = await fetch(`https://router.huggingface.co/hf-inference/models/${modelId}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -180,7 +180,7 @@ async function generateHuggingFaceVideo(payload, apiKey) {
   if (!apiKey) throw new Error('Hugging Face token required. Add it in Settings.');
 
   const modelId = payload.model_id;
-  const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+  const response = await fetch(`https://router.huggingface.co/hf-inference/models/${modelId}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
