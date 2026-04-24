@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const maxDuration = 300; // 5 min for video models
 
 async function parseJSON(response) {
   const text = await response.text();
@@ -78,6 +79,7 @@ async function generateHuggingFace(payload, apiKey) {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      'X-Wait-For-Model': 'true',
     },
     body: JSON.stringify({
       inputs: payload.prompt,
@@ -180,14 +182,37 @@ async function generateHuggingFaceVideo(payload, apiKey) {
   if (!apiKey) throw new Error('Hugging Face token required. Add it in Settings.');
 
   const modelId = payload.model_id;
-  const response = await fetch(`https://router.huggingface.co/hf-inference/models/${modelId}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload.request_body || { inputs: payload.prompt }),
-  });
+  const isImg2Vid = payload.request_body && payload.request_body.parameters?.motion_bucket_id;
+
+  let response;
+
+  if (isImg2Vid) {
+    // SVD image-to-video: send raw image bytes (not JSON)
+    const base64Data = payload.request_body.inputs;
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    response = await fetch(`https://router.huggingface.co/hf-inference/models/${modelId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'image/jpeg',
+        'X-Wait-For-Model': 'true',
+      },
+      body: imageBuffer,
+    });
+  } else {
+    // Text-to-video (AnimateDiff, LTX-Video): send JSON
+    const requestBody = payload.request_body || { inputs: payload.prompt };
+    response = await fetch(`https://router.huggingface.co/hf-inference/models/${modelId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-Wait-For-Model': 'true',
+      },
+      body: JSON.stringify(requestBody),
+    });
+  }
 
   if (response.status === 503) {
     const data = await parseJSON(response);
@@ -210,13 +235,17 @@ async function generateHuggingFaceVideo(payload, apiKey) {
     return { videoUrl: base64 };
   }
 
-  // Some models may return JSON with a URL
+  // Some models may return JSON with a URL or base64
   try {
     const data = await parseJSON(response);
     if (data[0]?.url) return { videoUrl: data[0].url };
     if (data.video?.url) return { videoUrl: data.video.url };
     if (data.output?.url) return { videoUrl: data.output.url };
     if (typeof data[0] === 'string' && data[0].startsWith('http')) return { videoUrl: data[0] };
+    // AnimateDiff may return base64 video directly
+    if (data[0] && typeof data[0] === 'object' && data[0].data) {
+      return { videoUrl: `data:video/mp4;base64,${data[0].data}` };
+    }
   } catch {}
 
   throw new Error('Unexpected response from Hugging Face video model');

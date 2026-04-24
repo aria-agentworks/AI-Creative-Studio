@@ -6,22 +6,22 @@ import { useState, useRef, useCallback } from 'react';
 // PROVIDERS
 // =============================================
 const PROVIDERS = {
-  huggingface_video: { name: 'Hugging Face', keyRequired: true, keyName: 'huggingface', desc: 'Free open-source video models' },
-  fal: { name: 'fal.ai', keyRequired: true, keyName: 'fal', desc: 'Premium Seedance 2.0' },
+  fal: { name: 'fal.ai', keyRequired: true, keyName: 'fal', desc: 'Seedance, Kling, Hailuo' },
 };
 
 // =============================================
 // VIDEO MODELS — grouped by tier
 // =============================================
 const VIDEO_MODELS = [
-  // ===== FREE — Needs free HF token (FLUX.1-schnell for frame-based) =====
-  // Note: Most open-source video models are not on HF free inference.
-  // Free text-to-video coming soon. Use fal.ai for production video.
-  // ===== PREMIUM — fal.ai =====
-  { id: 'bytedance/seedance-2.0/text-to-video', provider: 'fal', name: 'Seedance 2.0', tier: 'paid', desc: 'Best quality video generation', type: 'text', supportsRef: false },
-  { id: 'bytedance/seedance-2.0/fast/text-to-video', provider: 'fal', name: 'Seedance 2.0 Fast', tier: 'paid', desc: 'Lower cost, faster generation', type: 'text', supportsRef: false },
+  // ===== PREMIUM — fal.ai ($10 free credits on signup) =====
+  { id: 'bytedance/seedance-2.0/text-to-video', provider: 'fal', name: 'Seedance 2.0', tier: 'paid', desc: 'Best quality text-to-video', type: 'text', supportsRef: false },
+  { id: 'bytedance/seedance-2.0/fast/text-to-video', provider: 'fal', name: 'Seedance 2.0 Fast', tier: 'paid', desc: 'Lower cost, faster', type: 'text', supportsRef: false },
   { id: 'bytedance/seedance-2.0/image-to-video', provider: 'fal', name: 'Seedance Image to Video', tier: 'paid', desc: 'Animate an image into video', type: 'image', supportsRef: true },
   { id: 'bytedance/seedance-2.0/fast/image-to-video', provider: 'fal', name: 'Seedance I2V Fast', tier: 'paid', desc: 'Quick image animation', type: 'image', supportsRef: true },
+  { id: 'fal-ai/kling-video/v3/standard/text-to-video', provider: 'fal', name: 'Kling 3.0', tier: 'paid', desc: 'Kuaishou top video model', type: 'text', supportsRef: false },
+  { id: 'fal-ai/kling-video/v3/pro/image-to-video', provider: 'fal', name: 'Kling 3.0 I2V', tier: 'paid', desc: 'Image to video with audio', type: 'image', supportsRef: true },
+  { id: 'fal-ai/minimax/video-01/text-to-video', provider: 'fal', name: 'Hailuo Video', tier: 'paid', desc: 'MiniMax video generation', type: 'text', supportsRef: false },
+  { id: 'fal-ai/minimax/video-01/image-to-video', provider: 'fal', name: 'Hailuo I2V', tier: 'paid', desc: 'Hailuo image to video', type: 'image', supportsRef: true },
 ];
 
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'];
@@ -160,53 +160,6 @@ export default function VideoGenerator({ apiKeys }) {
           if (statusData.status === 'FAILED') throw new Error(statusData.error || 'Video generation failed');
         }
         throw new Error('Video generation timed out (6 minutes)');
-
-      } else if (provider === 'huggingface_video') {
-        // === HuggingFace Video: sync (but can take a long time) ===
-        const payload = { ...selectedModel.payload };
-
-        // Build the request body with the actual prompt
-        if (selectedModel.type === 'image' && refImage) {
-          // Image-to-video: extract base64 data
-          const base64Data = refImage.base64.replace(/^data:.+?;base64,/, '');
-          payload.request_body = {
-            inputs: base64Data,
-            parameters: { num_frames: 25, motion_bucket_id: 127 },
-          };
-        } else {
-          // Text-to-video
-          if (payload.request_body) {
-            // Replace PLACEHOLDER with actual prompt
-            const body = JSON.stringify(payload.request_body).replace(/PLACEHOLDER/g, prompt.trim());
-            payload.request_body = JSON.parse(body);
-          } else {
-            payload.request_body = { inputs: prompt.trim() };
-          }
-        }
-
-        setProgress('Generating... (this may take 1-5 min)');
-
-        const submitRes = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider: 'huggingface_video',
-            payload,
-            apiKeys,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
-
-        let submitData;
-        try { submitData = await submitRes.json(); } catch { throw new Error('Server returned an invalid response. Please try again.'); }
-        if (!submitRes.ok) throw new Error(submitData.error || 'Video generation failed');
-
-        if (submitData.videoUrl) {
-          setGeneratedVideos((prev) => [{ id: Date.now(), url: submitData.videoUrl, prompt: prompt.trim(), model: selectedModel.name, provider: PROVIDERS.huggingface_video.name, aspectRatio, duration, timestamp: new Date().toLocaleTimeString() }, ...prev]);
-          setProgress('');
-          return;
-        }
-        throw new Error('No video returned from the model');
       }
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message);
@@ -222,12 +175,11 @@ export default function VideoGenerator({ apiKeys }) {
   };
 
   const tierBadges = {
-    free_key: { label: 'FREE', class: 'bg-emerald-600 text-white' },
     paid: { label: 'PAID', class: 'bg-amber-500 text-black' },
   };
 
   const tierSections = [
-    { key: 'paid', title: 'Video Models \u2014 fal.ai Seedance 2.0', models: VIDEO_MODELS, icon: '\ud83c\udfac' },
+    { key: 'paid', title: 'Video Models \u2014 fal.ai (Free $10 Credits)', models: VIDEO_MODELS, icon: '\ud83c\udfac' },
   ];
 
   return (
@@ -241,7 +193,7 @@ export default function VideoGenerator({ apiKeys }) {
               Video <span className="text-[#d9ff00]">Studio</span>
             </h1>
             <p className="text-white/40 text-sm font-medium tracking-wide">
-              Open-source models + Seedance 2.0
+              Seedance 2.0, Kling 3.0, Hailuo — 8 models
             </p>
           </div>
 
@@ -258,11 +210,8 @@ export default function VideoGenerator({ apiKeys }) {
               onClick={() => setShowModelPicker(true)}
               className="w-full bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-white/20 transition-all group"
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg ${
-                selectedModel.tier === 'free_key' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              }`}>
-                {selectedModel.tier === 'free_key' ? '\ud83d\udd13' : '\ud83d\udc51'}
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg bg-amber-500/20 text-amber-400 border border-amber-500/30`}>
+                {'\ud83d\udc51'}
               </div>
               <div className="text-left flex-1">
                 <div className="flex items-center gap-2">
@@ -396,15 +345,13 @@ export default function VideoGenerator({ apiKeys }) {
                   className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     isGenerating
                       ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                      : selectedModel.tier === 'free_key'
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-lg hover:scale-105 active:scale-95 shadow-lg shadow-emerald-600/20'
-                        : 'bg-[#d9ff00] text-black hover:bg-[#e5ff33] hover:shadow-glow hover:scale-105 active:scale-95 shadow-lg shadow-[#d9ff00]/5'
+                      : 'bg-[#d9ff00] text-black hover:bg-[#e5ff33] hover:shadow-glow hover:scale-105 active:scale-95 shadow-lg shadow-[#d9ff00]/5'
                   } disabled:opacity-30 disabled:cursor-not-allowed`}
                 >
                   {isGenerating ? (
                     <><div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />Cancel</>
                   ) : (
-                    <>{selectedModel.tier === 'free_key' ? '\ud83d\udd13 ' : ''}Generate Video</>
+                    <>Generate Video</>
                   )}
                 </button>
               </div>
@@ -416,7 +363,7 @@ export default function VideoGenerator({ apiKeys }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-yellow-400 flex-shrink-0"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 <p className="text-[11px] text-yellow-400/80">
                   This model needs a <strong>{PROVIDERS[selectedModel.provider].name}</strong> API key. Add it in <strong>Settings</strong> (top right).
-                  {selectedModel.tier === 'free_key' && ' The HuggingFace token is free to get.'}
+                  fal.ai gives <strong>$10 free credits</strong> on signup.
                 </p>
               </div>
             )}
@@ -474,9 +421,9 @@ export default function VideoGenerator({ apiKeys }) {
                 </div>
                 <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3">
                   <p className="text-[11px] text-white/30">
-                    {selectedModel.provider === 'huggingface_video'
-                      ? 'Open-source video models run on HuggingFace free inference. First use triggers a cold start (2-5 min wait). Subsequent requests are faster.'
-                      : 'Seedance 2.0 generates high-quality videos via fal.ai. Typically takes 30-120 seconds.'}
+                    fal.ai gives <strong>$10 free credits</strong> on signup — enough for several videos.
+                    Sign up at <strong>fal.ai</strong> to get your API key.
+                    Video generation typically takes 30-120 seconds.
                   </p>
                 </div>
               </div>
@@ -602,10 +549,9 @@ export default function VideoGenerator({ apiKeys }) {
                           >
                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-base flex-shrink-0 ${
                               isSelected ? 'bg-[#d9ff00] text-black' :
-                              model.tier === 'free_key' ? 'bg-emerald-500/15 text-emerald-400' :
                               'bg-amber-500/15 text-amber-400'
                             }`}>
-                              {model.tier === 'free_key' ? '\ud83d\udd13' : '\ud83d\udc51'}
+                              {'\ud83c\udfac'}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -655,8 +601,8 @@ export default function VideoGenerator({ apiKeys }) {
                 <span className="text-[10px] text-white/30">Needs key</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-emerald-600 text-white">FREE</span>
-                <span className="text-[10px] text-white/30">Open-source</span>
+                <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-amber-500 text-black">PAID</span>
+                <span className="text-[10px] text-white/30">$10 free on signup</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-blue-500/20 text-blue-400">IMG2VID</span>

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
+  // Report which API keys are configured server-side (without exposing values)
   return NextResponse.json({
-    models: [
-      { id: 'black-forest-labs/flux-2-pro', name: 'Flux 2 Pro', desc: 'Best quality, premium tier' },
-      { id: 'black-forest-labs/flux-2-dev', name: 'Flux 2 Dev', desc: 'High quality, balanced' },
-      { id: 'black-forest-labs/flux-2-flex', name: 'Flux 2 Flex', desc: 'Fast and flexible' },
-      { id: 'black-forest-labs/flux-2-klein', name: 'Flux 2 Klein', desc: 'Ultra fast, compact' },
-    ],
+    serverKeys: {
+      huggingface: !!process.env.HF_API_KEY,
+      fal: !!process.env.FAL_API_KEY,
+      together: !!process.env.TOGETHER_API_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+    },
   });
 }

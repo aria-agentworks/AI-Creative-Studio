@@ -11,13 +11,21 @@ const PROVIDERS = {
 };
 
 const MODELS = [
-  // ===== FREE — NO KEY NEEDED =====
-  { id: 'pollinations-flux', provider: 'pollinations', name: 'Flux', desc: 'Unlimited, no API key needed', tier: 'free', payload: { model: 'flux' }, supportsRef: false },
-  { id: 'pollinations-turbo', provider: 'pollinations', name: 'Flux Turbo', desc: 'Fast free generation, no key', tier: 'free', payload: { model: 'turbo' }, supportsRef: false },
+  // ===== FREE — NO KEY NEEDED (Pollinations.ai) =====
+  { id: 'pollinations-flux', provider: 'pollinations', name: 'Flux', desc: 'High quality, unlimited free', tier: 'free', payload: { model: 'flux' }, supportsRef: false },
+  { id: 'pollinations-turbo', provider: 'pollinations', name: 'Flux Turbo', desc: 'Fast generation, no queue', tier: 'free', payload: { model: 'turbo' }, supportsRef: false },
+  { id: 'pollinations-realism', provider: 'pollinations', name: 'Flux Realism', desc: 'Photo-realistic output', tier: 'free', payload: { model: 'flux-realism' }, supportsRef: false },
+  { id: 'pollinations-anime', provider: 'pollinations', name: 'Flux Anime', desc: 'Anime / illustration style', tier: 'free', payload: { model: 'flux-anime' }, supportsRef: false },
+  { id: 'pollinations-3d', provider: 'pollinations', name: 'Flux 3D', desc: '3D render style', tier: 'free', payload: { model: 'flux-3d' }, supportsRef: false },
+  { id: 'pollinations-cablyai', provider: 'pollinations', name: 'CablyAI', desc: 'Creative artistic style', tier: 'free', payload: { model: 'flux-cablyai' }, supportsRef: false },
+  { id: 'pollinations-sdxl', provider: 'pollinations', name: 'Stable Diffusion XL', desc: 'Classic open-source model', tier: 'free', payload: { model: 'sdxl' }, supportsRef: false },
+  { id: 'pollinations-dreamshaper', provider: 'pollinations', name: 'DreamShaper', desc: 'Fantasy / dreamy style', tier: 'free', payload: { model: 'dreamshaper' }, supportsRef: false },
+  { id: 'pollinations-flux-pro', provider: 'pollinations', name: 'Flux Pro', desc: 'Enhanced Flux quality', tier: 'free', payload: { model: 'flux-pro' }, supportsRef: false },
+  { id: 'pollinations-flux-4o', provider: 'pollinations', name: 'Flux 4o', desc: 'Latest Flux variant', tier: 'free', payload: { model: 'flux-4o' }, supportsRef: false },
   // ===== FREE — NEEDS FREE API KEY =====
-  { id: 'hf-flux-schnell', provider: 'huggingface', name: 'FLUX.1 Schnell', desc: 'Top quality open-source (HF token)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
-  { id: 'together-flux-schnell', provider: 'together', name: 'FLUX.1 Schnell', desc: 'Free unlimited (Together AI key)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
-  { id: 'gemini-flash', provider: 'gemini', name: 'Gemini 2.0 Flash', desc: 'Free ~500/day + ref image (Gemini key)', tier: 'free_key', payload: { model_id: 'gemini-2.0-flash-image-generation' }, supportsRef: true },
+  { id: 'hf-flux-schnell', provider: 'huggingface', name: 'FLUX.1 Schnell', desc: 'Open-source, 4-step (HF token)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
+  { id: 'together-flux-schnell', provider: 'together', name: 'FLUX.1 Schnell', desc: 'Free unlimited (Together AI)', tier: 'free_key', payload: { model_id: 'black-forest-labs/FLUX.1-schnell', steps: 4 }, supportsRef: false },
+  { id: 'gemini-flash', provider: 'gemini', name: 'Gemini 2.0 Flash', desc: 'Free ~500/day + ref image', tier: 'free_key', payload: { model_id: 'gemini-2.0-flash-image-generation' }, supportsRef: true },
   // ===== PREMIUM =====
   { id: 'together-flux-dev', provider: 'together', name: 'FLUX.1 Dev', desc: 'High quality (Together credits)', tier: 'paid', payload: { model_id: 'black-forest-labs/FLUX.1-dev', steps: 28 }, supportsRef: false },
   { id: 'fal-ai/flux-2-flash', provider: 'fal', name: 'Flux 2 Flash', desc: 'Ultra fast ($0.003/MP)', tier: 'paid', falEndpoint: 'fal-ai/flux-2/flash', supportsRef: true },
