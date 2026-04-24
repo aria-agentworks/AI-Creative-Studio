@@ -3,10 +3,17 @@ import { NextResponse } from 'next/server';
 const FAL_BASE = 'https://queue.fal.run';
 
 function getClientKey(request, providedKey) {
-  // Use key from request body (passed from client localStorage)
-  // or fallback to env var if set
   if (providedKey) return providedKey;
   return process.env.FAL_API_KEY || '';
+}
+
+async function parseJSON(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid JSON response from API: ${text.slice(0, 200)}`);
+  }
 }
 
 async function submitToQueue(endpoint, payload, apiKey) {
@@ -24,7 +31,7 @@ async function submitToQueue(endpoint, payload, apiKey) {
   if (!response.ok) {
     let errorMsg = `API error (${response.status})`;
     try {
-      const errData = await response.json();
+      const errData = await parseJSON(response);
       errorMsg = errData.detail || errData.error || errData.message || errorMsg;
     } catch {
       try { errorMsg = await response.text(); } catch {}
@@ -32,7 +39,7 @@ async function submitToQueue(endpoint, payload, apiKey) {
     throw new Error(errorMsg);
   }
 
-  return await response.json();
+  return await parseJSON(response);
 }
 
 async function getResult(endpoint, requestId, apiKey) {
@@ -47,7 +54,7 @@ async function getResult(endpoint, requestId, apiKey) {
     throw new Error(`Failed to fetch result (${response.status})`);
   }
 
-  return await response.json();
+  return await parseJSON(response);
 }
 
 async function getStatus(endpoint, requestId, apiKey) {
@@ -62,23 +69,28 @@ async function getStatus(endpoint, requestId, apiKey) {
     throw new Error(`Failed to fetch status (${response.status})`);
   }
 
-  return await response.json();
+  return await parseJSON(response);
 }
 
 // Try direct (sync) endpoint first, fall back to queue
 async function tryDirect(endpoint, payload, apiKey) {
-  const url = `https://fal.run/${endpoint}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Key ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const url = `https://fal.run/${endpoint}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Key ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) return null;
-  return await response.json();
+    if (!response.ok) return null;
+    return await parseJSON(response);
+  } catch (error) {
+    console.log(`[fal.ai] Direct attempt failed: ${error.message}`);
+    return null;
+  }
 }
 
 // POST /api/generate — Submit generation request
@@ -119,7 +131,7 @@ export async function POST(request) {
 
     if (!requestId) {
       // Maybe it returned a direct result in queue format
-      if (submitData.images) {
+      if (submitData.images && submitData.images.length > 0) {
         return NextResponse.json({ imageUrl: submitData.images[0].url });
       }
       if (submitData.video) {
@@ -174,9 +186,17 @@ export async function GET(request) {
     }
 
     if (status === 'FAILED') {
+      // Fetch the error details from the result
+      let errorMsg = 'Generation failed';
+      try {
+        const result = await getResult(endpoint, requestId, clientKey);
+        errorMsg = result.error || result.detail || errorMsg;
+      } catch {
+        // If we can't get the result, just use the default message
+      }
       return NextResponse.json({
         status: 'FAILED',
-        error: result?.error || 'Generation failed',
+        error: errorMsg,
       });
     }
 

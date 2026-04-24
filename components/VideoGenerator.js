@@ -68,7 +68,12 @@ export default function VideoGenerator({ apiKey }) {
         signal: abortControllerRef.current.signal,
       });
 
-      const submitData = await submitRes.json();
+      let submitData;
+      try {
+        submitData = await submitRes.json();
+      } catch {
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
       if (!submitRes.ok) throw new Error(submitData.error || 'Submission failed');
 
       if (submitData.videoUrl) {

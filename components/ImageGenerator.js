@@ -55,7 +55,6 @@ export default function ImageGenerator({ apiKey }) {
       prompt: fullPrompt,
       image_size: selectedSize.value,
       output_format: 'png',
-      enable_safety_checker: false,
     };
 
     if (seed !== -1) payload.seed = seed;
@@ -81,7 +80,12 @@ export default function ImageGenerator({ apiKey }) {
         signal: abortControllerRef.current.signal,
       });
 
-      const submitData = await submitRes.json();
+      let submitData;
+      try {
+        submitData = await submitRes.json();
+      } catch {
+        throw new Error(`Server returned an invalid response. Please try again.`);
+      }
 
       if (!submitRes.ok) {
         throw new Error(submitData.error || `Generation failed (${submitRes.status})`);
